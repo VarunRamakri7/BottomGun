@@ -7,4 +7,4 @@ The flyer is controlled with the mouse.
   - Left and right will alter zoom.
   - Up and down will alter flyer height
 
-Click [here]() to play
+Click [here](https://varunramakri7.github.io/BottomGun/) to play

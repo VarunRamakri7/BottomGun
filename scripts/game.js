@@ -122,6 +122,7 @@ function createScene() {
 
   renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(WIDTH, HEIGHT);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
   renderer.shadowMap.enabled = true;
 
@@ -150,29 +151,18 @@ function handleWindowResize() {
   camera.updateProjectionMatrix();
 }
 
-function handleMouseMove(event) {
-  var tx = -1 + (event.clientX / WIDTH)*2;
-  var ty = 1 - (event.clientY / HEIGHT)*2;
-  mousePos = {x:tx, y:ty};
+function setPointerFromEvent(event) {
+  var tx = -1 + (event.clientX / WIDTH) * 2;
+  var ty = 1 - (event.clientY / HEIGHT) * 2;
+  mousePos = { x: tx, y: ty };
 }
 
-function handleTouchMove(event) {
-    event.preventDefault();
-    var tx = -1 + (event.touches[0].pageX / WIDTH)*2;
-    var ty = 1 - (event.touches[0].pageY / HEIGHT)*2;
-    mousePos = {x:tx, y:ty};
+function handlePointerMove(event) {
+  setPointerFromEvent(event);
 }
 
-function handleMouseUp(event){
-  if (game.status == "waitingReplay"){
-    resetGame();
-    hideReplay();
-  }
-}
-
-
-function handleTouchEnd(event){
-  if (game.status == "waitingReplay"){
+function handlePointerUp() {
+  if (game.status == "waitingReplay") {
     resetGame();
     hideReplay();
   }
@@ -651,13 +641,21 @@ Particle.prototype.explode = function(pos, color, scale){
   var targetX = pos.x + (-1 + Math.random()*2)*50;
   var targetY = pos.y + (-1 + Math.random()*2)*50;
   var speed = .6+Math.random()*.2;
-  TweenMax.to(this.mesh.rotation, speed, {x:Math.random()*12, y:Math.random()*12});
-  TweenMax.to(this.mesh.scale, speed, {x:.1, y:.1, z:.1});
-  TweenMax.to(this.mesh.position, speed, {x:targetX, y:targetY, delay:Math.random() *.1, ease:Power2.easeOut, onComplete:function(){
-      if(_p) _p.remove(_this.mesh);
-      _this.mesh.scale.set(1,1,1);
+  var delay = Math.random() * .1;
+  gsap.to(this.mesh.rotation, { duration: speed, x: Math.random() * 12, y: Math.random() * 12, ease: "power2.out" });
+  gsap.to(this.mesh.scale, { duration: speed, x: .1, y: .1, z: .1, ease: "power2.out" });
+  gsap.to(this.mesh.position, {
+    duration: speed,
+    delay: delay,
+    x: targetX,
+    y: targetY,
+    ease: "power2.out",
+    onComplete: function () {
+      if (_p) _p.remove(_this.mesh);
+      _this.mesh.scale.set(1, 1, 1);
       particlesPool.unshift(_this);
-    }});
+    }
+  });
 }
 
 ParticlesHolder = function (){
@@ -992,12 +990,11 @@ function init(event){
   createEnnemies();
   createParticles();
 
-  document.addEventListener('mousemove', handleMouseMove, false);
-  document.addEventListener('touchmove', handleTouchMove, false);
-  document.addEventListener('mouseup', handleMouseUp, false);
-  document.addEventListener('touchend', handleTouchEnd, false);
+  document.addEventListener('pointermove', handlePointerMove, { passive: true });
+  document.addEventListener('pointerup', handlePointerUp);
+  document.addEventListener('pointercancel', handlePointerUp);
 
   loop();
 }
 
-window.addEventListener('load', init, false);
+window.addEventListener('DOMContentLoaded', init, false);

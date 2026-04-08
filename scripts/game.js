@@ -9,8 +9,8 @@
  *   5) `loop` — requestAnimationFrame game loop; branches on `game.status`
  *   6) HUD updates (`updateDistance`, `updateEnergy`), flight (`updatePlane`), `init` entry point
  *
- * `game.status`: "playing" → normal flight | "gameover" → plane falls | "waitingReplay" → click/tap restarts
- * `mousePos`: normalized from pointer x/y (~[-1,1]) — drives speed, height, and camera FOV.
+ * `game.status`: "intro" → title overlay | "playing" | "paused" | "gameover" | "waitingReplay"
+ * `mousePos`: normalized pointer (~[-1,1]) from mouse/touch drag — drives height, speed, and camera FOV (“zoom”).
  */
 
 // --- Material palette (hex integers for THREE.Color / Mesh*Material) ---
@@ -35,6 +35,185 @@ var ennemiesPool = [];
 /** Particle meshes recycled after GSAP tweens finish. */
 var particlesPool = [];
 var particlesInUse = [];
+
+var prefersReducedMotion =
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+var audioEnabled = false;
+var audioCtx = null;
+
+var steerHintTimer = null;
+var ONBOARDING_KEY = 'bottomgun_onboarding_done';
+
+function initAudioContext() {
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!audioCtx) audioCtx = new AC();
+  return audioCtx;
+}
+
+function resumeAudioCtx() {
+  var ctx = initAudioContext();
+  if (ctx && ctx.state === 'suspended') ctx.resume();
+}
+
+/** Short UI beeps (Web Audio). No external files; stays muted until user enables sound. */
+function playSound(kind) {
+  if (!audioEnabled) return;
+  var ctx = initAudioContext();
+  if (!ctx) return;
+  resumeAudioCtx();
+  var now = ctx.currentTime;
+  var o = ctx.createOscillator();
+  var g = ctx.createGain();
+  o.connect(g);
+  g.connect(ctx.destination);
+  o.type = 'sine';
+  if (kind === 'coin') {
+    o.frequency.setValueAtTime(660, now);
+    o.frequency.exponentialRampToValueAtTime(990, now + 0.07);
+    g.gain.setValueAtTime(0.07, now);
+    g.gain.exponentialRampToValueAtTime(0.0008, now + 0.12);
+    o.start(now);
+    o.stop(now + 0.12);
+  } else if (kind === 'hit') {
+    o.type = 'square';
+    o.frequency.setValueAtTime(200, now);
+    g.gain.setValueAtTime(0.055, now);
+    g.gain.exponentialRampToValueAtTime(0.0008, now + 0.14);
+    o.start(now);
+    o.stop(now + 0.14);
+  } else if (kind === 'level') {
+    o.frequency.setValueAtTime(523, now);
+    o.frequency.setValueAtTime(659, now + 0.09);
+    g.gain.setValueAtTime(0.08, now);
+    g.gain.exponentialRampToValueAtTime(0.0008, now + 0.22);
+    o.start(now);
+    o.stop(now + 0.22);
+  } else if (kind === 'gameover') {
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(220, now);
+    o.frequency.exponentialRampToValueAtTime(90, now + 0.45);
+    g.gain.setValueAtTime(0.09, now);
+    g.gain.exponentialRampToValueAtTime(0.0008, now + 0.5);
+    o.start(now);
+    o.stop(now + 0.5);
+  }
+}
+
+function setAudioEnabled(on) {
+  audioEnabled = !!on;
+  if (audioEnabled) resumeAudioCtx();
+  var btn = document.getElementById('soundToggleBtn');
+  if (btn) {
+    btn.textContent = audioEnabled ? 'Sound on' : 'Sound off';
+    btn.setAttribute('aria-pressed', audioEnabled ? 'true' : 'false');
+  }
+}
+
+function hudFlash(className) {
+  if (prefersReducedMotion) return;
+  var el = document.getElementById('gameHolder');
+  if (!el) return;
+  el.classList.remove('hud-flash--coin', 'hud-flash--hit');
+  void el.offsetWidth;
+  el.classList.add(className);
+  setTimeout(function () {
+    el.classList.remove(className);
+  }, 260);
+}
+
+function onCoinPickupHud() {
+  hudFlash('hud-flash--coin');
+  playSound('coin');
+}
+
+function onEnemyHitHud() {
+  hudFlash('hud-flash--hit');
+  playSound('hit');
+}
+
+function formatDistance(n) {
+  return Math.floor(n).toLocaleString('en-US');
+}
+
+function beginSteerHint() {
+  var hint = document.getElementById('steerHint');
+  if (!hint || prefersReducedMotion) return;
+  hint.classList.remove('steer-hint--hide');
+  hint.setAttribute('aria-hidden', 'false');
+  clearTimeout(steerHintTimer);
+  steerHintTimer = setTimeout(function () {
+    hint.classList.add('steer-hint--hide');
+    hint.setAttribute('aria-hidden', 'true');
+  }, 4500);
+}
+
+function triggerLevelUpFx() {
+  if (fieldLevel) {
+    fieldLevel.classList.remove('level-value--pop');
+    void fieldLevel.offsetWidth;
+    fieldLevel.classList.add('level-value--pop');
+    setTimeout(function () {
+      fieldLevel.classList.remove('level-value--pop');
+    }, 420);
+  }
+  playSound('level');
+}
+
+function updatePauseUi() {
+  var overlay = document.getElementById('pauseOverlay');
+  var btn = document.getElementById('pauseBtn');
+  if (overlay) overlay.hidden = game.status !== 'paused';
+  if (btn) {
+    btn.textContent = game.status === 'paused' ? 'Resume' : 'Pause';
+    btn.setAttribute('aria-pressed', game.status === 'paused' ? 'true' : 'false');
+  }
+}
+
+function togglePause() {
+  if (game.status === 'playing') {
+    game.status = 'paused';
+    updatePauseUi();
+  } else if (game.status === 'paused') {
+    game.status = 'playing';
+    updatePauseUi();
+  }
+}
+
+function configureIntroOverlay() {
+  var ov = document.getElementById('startOverlay');
+  if (!ov) return;
+  if (localStorage.getItem(ONBOARDING_KEY)) {
+    ov.hidden = true;
+    game.status = 'playing';
+  } else {
+    game.status = 'intro';
+    ov.hidden = false;
+  }
+}
+
+/** Esc pauses; Space/Enter restarts after game over (no steering keys). */
+function onGlobalKeyDown(e) {
+  if (game.status === 'intro') return;
+
+  if (e.key === 'Escape') {
+    if (game.status === 'playing' || game.status === 'paused') {
+      e.preventDefault();
+      togglePause();
+    }
+    return;
+  }
+
+  if (
+    game.status === 'waitingReplay' &&
+    (e.key === ' ' || e.key === 'Enter')
+  ) {
+    e.preventDefault();
+    tryReplayFromUser();
+  }
+}
 
 /** Reset all tunables to defaults; call on startup and when restarting after game over. */
 function resetGame(){
@@ -169,7 +348,7 @@ function handleWindowResize() {
 
 /**
  * Map client coordinates to a centered [-1, 1] range (x = horizontal steer, y = vertical).
- * Used by `updatePlane` via `normalize()` for target position and speed.
+ * Used by `updatePlane`: Y → altitude, X → speed + camera FOV (zoom).
  */
 function setPointerFromEvent(event) {
   var tx = -1 + (event.clientX / WIDTH) * 2;
@@ -181,12 +360,20 @@ function handlePointerMove(event) {
   setPointerFromEvent(event);
 }
 
-/** After crash, any pointer up restarts the run (paired with HUD “Click to Replay”). */
+var lastReplayAt = 0;
+
+/** After crash, tap/click anywhere (or the replay button) restarts the run. */
+function tryReplayFromUser() {
+  if (game.status !== "waitingReplay") return;
+  var now = Date.now();
+  if (now - lastReplayAt < 400) return;
+  lastReplayAt = now;
+  resetGame();
+  hideReplay();
+}
+
 function handlePointerUp() {
-  if (game.status == "waitingReplay") {
-    resetGame();
-    hideReplay();
-  }
+  tryReplayFromUser();
 }
 
 var ambientLight, hemisphereLight, shadowLight;
@@ -644,6 +831,7 @@ EnnemiesHolder.prototype.rotateEnnemies = function(){
       ambientLight.intensity = 2;
 
       removeEnergy();
+      onEnemyHitHud();
       i--;
     }else if (ennemy.angle > Math.PI){
       // Passed behind the player — recycle to pool
@@ -674,6 +862,12 @@ Particle.prototype.explode = function(pos, color, scale){
   this.mesh.scale.set(scale, scale, scale);
   var targetX = pos.x + (-1 + Math.random()*2)*50;
   var targetY = pos.y + (-1 + Math.random()*2)*50;
+  if (prefersReducedMotion) {
+    if (_p) _p.remove(_this.mesh);
+    _this.mesh.scale.set(1, 1, 1);
+    particlesPool.unshift(_this);
+    return;
+  }
   var speed = .6+Math.random()*.2;
   var delay = Math.random() * .1;
   gsap.to(this.mesh.rotation, { duration: speed, x: Math.random() * 12, y: Math.random() * 12, ease: "power2.out" });
@@ -786,6 +980,7 @@ CoinsHolder.prototype.rotateCoins = function(){
       this.mesh.remove(coin.mesh);
       particlesHolder.spawnParticles(coin.mesh.position.clone(), 5, 0x009999, .8);
       addEnergy();
+      onCoinPickupHud();
       i--;
     }else if (coin.angle > Math.PI){
       // Missed — put back in pool
@@ -862,6 +1057,12 @@ function loop(){
   deltaTime = newTime-oldTime;
   oldTime = newTime;
 
+  if (game.status === 'intro' || game.status === 'paused') {
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+    return;
+  }
+
   if (game.status=="playing"){
 
     // Milestone triggers (distance is in abstract units; see `ratioSpeedDistance`)
@@ -885,6 +1086,7 @@ function loop(){
       game.levelLastUpdate = Math.floor(game.distance);
       game.level++;
       fieldLevel.innerHTML = Math.floor(game.level);
+      triggerLevelUpFx();
 
       game.targetBaseSpeed = game.initSpeed + game.incrementSpeedByLevel*game.level
     }
@@ -934,7 +1136,7 @@ function loop(){
 /** HUD distance text + SVG ring progress toward the next level (`stroke-dashoffset` trick). */
 function updateDistance(){
   game.distance += game.speed*deltaTime*game.ratioSpeedDistance;
-  fieldDistance.innerHTML = Math.floor(game.distance);
+  fieldDistance.textContent = formatDistance(game.distance);
   var d = 502*(1-(game.distance%game.distanceForLevelUpdate)/game.distanceForLevelUpdate);
   levelCircle.setAttribute("stroke-dashoffset", d);
 
@@ -949,13 +1151,20 @@ function updateEnergy(){
   energyBar.style.right = (100-game.energy)+"%";
   energyBar.style.backgroundColor = (game.energy<50)? "#f25346" : "#68c3c0";
 
-  if (game.energy<30){
+  if (energyLowBadge) {
+    energyLowBadge.hidden = game.energy >= 30;
+  }
+
+  if (game.energy<30 && !prefersReducedMotion){
     energyBar.style.animationName = "blinking";
   }else{
     energyBar.style.animationName = "none";
   }
 
   if (game.energy <1){
+    if (game.status === "playing") {
+      playSound('gameover');
+    }
     game.status = "gameover";
   }
 }
@@ -973,7 +1182,7 @@ function removeEnergy(){
 }
 
 /**
- * Smoothly steers the plane toward pointer-derived targets and updates camera FOV / follow height.
+ * Smoothly steers the plane from pointer drag: horizontal → speed + camera FOV (zoom); vertical → height.
  * `planeCollision*` fields add temporary knockback after hitting an enemy (decay each frame).
  */
 function updatePlane(){
@@ -1015,6 +1224,11 @@ function hideReplay(){
   replayMessage.style.display="none";
 }
 
+function handleReplayClick(e) {
+  if (e) e.stopPropagation();
+  tryReplayFromUser();
+}
+
 /** Linear map: clamp `v` to [vmin,vmax], then remap proportionally to [tmin,tmax]. */
 function normalize(v,vmin,vmax,tmin, tmax){
   var nv = Math.max(Math.min(v,vmax), vmin);
@@ -1025,7 +1239,7 @@ function normalize(v,vmin,vmax,tmin, tmax){
   return tv;
 }
 
-var fieldDistance, energyBar, replayMessage, fieldLevel, levelCircle;
+var fieldDistance, energyBar, replayMessage, fieldLevel, levelCircle, energyLowBadge;
 
 /** Wire DOM, reset state, build the 3D scene, attach input listeners, start `loop`. */
 function init(event){
@@ -1035,6 +1249,7 @@ function init(event){
   replayMessage = document.getElementById("replayMessage");
   fieldLevel = document.getElementById("levelValue");
   levelCircle = document.getElementById("levelCircleStroke");
+  energyLowBadge = document.getElementById("energyLowBadge");
 
   resetGame();
   createScene();
@@ -1047,9 +1262,54 @@ function init(event){
   createEnnemies();
   createParticles();
 
+  configureIntroOverlay();
+  updatePauseUi();
+  setAudioEnabled(false);
+
+  var startBtn = document.getElementById('startGameBtn');
+  var enableSoundBtn = document.getElementById('enableSoundBtn');
+  var pauseBtn = document.getElementById('pauseBtn');
+  var resumeBtn = document.getElementById('resumeBtn');
+  var soundToggleBtn = document.getElementById('soundToggleBtn');
+
+  if (startBtn) {
+    startBtn.addEventListener('click', function () {
+      localStorage.setItem(ONBOARDING_KEY, '1');
+      var ov = document.getElementById('startOverlay');
+      if (ov) ov.hidden = true;
+      game.status = 'playing';
+      beginSteerHint();
+    });
+  }
+  if (enableSoundBtn) {
+    enableSoundBtn.addEventListener('click', function () {
+      setAudioEnabled(true);
+    });
+  }
+  if (soundToggleBtn) {
+    soundToggleBtn.addEventListener('click', function () {
+      setAudioEnabled(!audioEnabled);
+    });
+  }
+  if (pauseBtn) {
+    pauseBtn.addEventListener('click', function () {
+      if (game.status === 'playing' || game.status === 'paused') togglePause();
+    });
+  }
+  if (resumeBtn) {
+    resumeBtn.addEventListener('click', function () {
+      if (game.status === 'paused') togglePause();
+    });
+  }
+  if (replayMessage) {
+    replayMessage.addEventListener('click', handleReplayClick);
+  }
+
   document.addEventListener('pointermove', handlePointerMove, { passive: true });
   document.addEventListener('pointerup', handlePointerUp);
   document.addEventListener('pointercancel', handlePointerUp);
+
+  window.addEventListener('keydown', onGlobalKeyDown);
 
   loop();
 }

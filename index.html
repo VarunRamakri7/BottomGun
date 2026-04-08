@@ -12,6 +12,15 @@
   </head>
   <body>
     <div class="game-holder" id="gameHolder">
+      <div class="hud-controls" aria-label="Game controls">
+        <button type="button" class="hud-btn" id="pauseBtn" title="Pause (Esc)" aria-pressed="false">
+          Pause
+        </button>
+        <button type="button" class="hud-btn hud-btn--ghost" id="soundToggleBtn" title="Sound" aria-label="Enable sound">
+          Sound off
+        </button>
+      </div>
+
       <div class="header">
         <h1><span>Gun</span>Bottom</h1>
         <h2>fly it as far as you can</h2>
@@ -42,19 +51,52 @@
           </div>
           <div class="score__content" id="dist">
             <div class="score__label">distance</div>
-            <div class="score__value score__value--dist" id="distValue">000</div>
+            <div class="score__value score__value--dist" id="distValue">0</div>
           </div>
-          <div class="score__content" id="energy">
+          <div class="score__content score__content--energy" id="energy">
             <div class="score__label">energy</div>
+            <span class="energy-low-badge" id="energyLowBadge" hidden>Low</span>
             <div class="score__value score__value--energy" id="energyValue">
               <div class="energy-bar" id="energyBar"></div>
             </div>
           </div>
         </div>
       </div>
-      <div class="world" id="world"></div>
-      <div class="message message--replay" id="replayMessage">Click to Replay</div>
-      <div class="message message--instructions" id="instructions">Grab the blue pills<span>avoid the red ones</span></div>
+      <div class="world" id="world" tabindex="-1"></div>
+
+      <p class="steer-hint" id="steerHint" aria-hidden="true">Drag up/down — height · Drag left/right — zoom</p>
+
+      <div class="overlay overlay--start" id="startOverlay" role="dialog" aria-modal="true" aria-labelledby="startTitle">
+        <div class="overlay__panel">
+          <h2 class="overlay__title" id="startTitle">How to play</h2>
+          <ul class="overlay__list">
+            <li><strong>Drag up or down</strong> (mouse or finger) to control <strong>flight height</strong>.</li>
+            <li><strong>Drag left or right</strong> to change <strong>camera zoom</strong> (field of view) and forward speed.</li>
+            <li>Collect <span class="txt-cyan">cyan</span> pickups for energy.</li>
+            <li>Avoid <span class="txt-red">red</span> obstacles — they drain energy and knock you back.</li>
+            <li><kbd>Esc</kbd> pauses. Sound starts muted — use <strong>Enable sound</strong> if you want audio.</li>
+          </ul>
+          <div class="overlay__actions">
+            <button type="button" class="btn btn--primary" id="startGameBtn">Start game</button>
+            <button type="button" class="btn btn--secondary" id="enableSoundBtn">Enable sound</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay overlay--pause" id="pauseOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+        <div class="overlay__panel">
+          <h2 class="overlay__title" id="pauseTitle">Paused</h2>
+          <p class="overlay__hint">Press <kbd>Esc</kbd> or Resume to continue.</p>
+          <button type="button" class="btn btn--primary" id="resumeBtn">Resume</button>
+        </div>
+      </div>
+
+      <button type="button" class="message message--replay" id="replayMessage">
+        Tap or click to replay
+      </button>
+      <div class="message message--instructions" id="instructions">
+        Grab the blue pills<span>avoid the red ones</span>
+      </div>
     </div>
   </body>
 </html>

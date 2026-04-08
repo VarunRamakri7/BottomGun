@@ -68,7 +68,7 @@ Events are bound on **`document`** (`pointermove`, `pointerup`, `pointercancel`)
 
 ### HUD
 
-DOM nodes (`#distValue`, `#levelValue`, `#energyBar`, `#levelCircleStroke`, replay message) are updated from the same loop. Energy drains with speed; low energy triggers a CSS blink animation on the bar.
+Glass-style **level** and **distance** cards sit under the title; the **level ring** sits beside the level numeral. **Energy** is a dark “floating” bar **pinned in screen space to the plane** (world position projected through the camera each frame). DOM ids: `#distValue`, `#levelValue`, `#levelCircleStroke`, `#energyBar`, `#planeEnergyHud`. Energy drains with speed; low energy triggers a CSS blink on the fill.
 
 ### GitHub Pages
 

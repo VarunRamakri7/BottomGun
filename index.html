@@ -24,45 +24,77 @@
       <div class="header">
         <h1><span>Gun</span>Bottom</h1>
         <h2>fly it as far as you can</h2>
-        <div class="score" id="score">
-          <div class="score__content" id="level">
-            <div class="score__label">level</div>
-            <div class="score__value score__value--level" id="levelValue">1</div>
-            <svg
-              class="level-circle"
-              id="levelCircle"
-              viewBox="0 0 200 200"
-              width="200"
-              height="200"
-              aria-hidden="true"
-            >
-              <circle id="levelCircleBgr" r="80" cx="100" cy="100" fill="none" stroke="#d1b790" stroke-width="24" />
-              <circle
-                id="levelCircleStroke"
-                r="80"
-                cx="100"
-                cy="100"
-                fill="none"
-                stroke="#68c3c0"
-                stroke-width="14"
-                stroke-dasharray="502"
-              />
-            </svg>
+
+        <div class="hud-strip" id="score">
+          <div class="hud-card hud-card--level" id="level">
+            <span class="hud-card__label">Level</span>
+            <div class="hud-card__row hud-card__row--level">
+              <svg
+                class="hud-ring"
+                id="levelCircle"
+                viewBox="0 0 72 72"
+                width="44"
+                height="44"
+                aria-hidden="true"
+              >
+                <defs>
+                  <linearGradient id="levelRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#7dd3ce" />
+                    <stop offset="100%" stop-color="#4a9e9b" />
+                  </linearGradient>
+                </defs>
+                <circle
+                  id="levelCircleBgr"
+                  class="hud-ring__track"
+                  r="28"
+                  cx="36"
+                  cy="36"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.35)"
+                  stroke-width="5"
+                />
+                <circle
+                  id="levelCircleStroke"
+                  class="hud-ring__progress"
+                  r="28"
+                  cx="36"
+                  cy="36"
+                  fill="none"
+                  stroke="url(#levelRingGrad)"
+                  stroke-width="5"
+                  stroke-linecap="round"
+                  stroke-dasharray="175.929"
+                  transform="rotate(-90 36 36)"
+                />
+              </svg>
+              <span class="hud-card__value hud-card__value--level" id="levelValue">1</span>
+            </div>
           </div>
-          <div class="score__content" id="dist">
-            <div class="score__label">distance</div>
-            <div class="score__value score__value--dist" id="distValue">0</div>
-          </div>
-          <div class="score__content score__content--energy" id="energy">
-            <div class="score__label">energy</div>
-            <span class="energy-low-badge" id="energyLowBadge" hidden>Low</span>
-            <div class="score__value score__value--energy" id="energyValue">
-              <div class="energy-bar" id="energyBar"></div>
+
+          <div class="hud-card hud-card--dist" id="dist">
+            <span class="hud-card__label">Distance</span>
+            <div class="hud-card__row">
+              <span class="hud-card__value hud-card__value--dist" id="distValue">0</span>
+              <span class="hud-card__unit">m</span>
             </div>
           </div>
         </div>
       </div>
+
       <div class="world" id="world" tabindex="-1"></div>
+
+      <!-- Energy follows the plane in screen space (position updated in game.js) -->
+      <div class="plane-energy-hud" id="planeEnergyHud" hidden>
+        <div class="plane-energy-hud__inner">
+          <div class="plane-energy-hud__head">
+            <span class="plane-energy-hud__label">Energy</span>
+            <span class="plane-energy-hud__low" id="energyLowBadge" hidden>Low</span>
+          </div>
+          <div class="plane-energy-hud__track">
+            <div class="plane-energy-hud__fill" id="energyBar"></div>
+          </div>
+        </div>
+      </div>
 
       <p class="steer-hint" id="steerHint" aria-hidden="true">Drag up/down — height · Drag left/right — zoom</p>
 

@@ -138,6 +138,12 @@ function formatDistance(n) {
   return Math.floor(n).toLocaleString('en-US');
 }
 
+/** SVG `#levelCircleStroke` uses r=28 → path length 2πr (must match HTML). */
+var LEVEL_RING_C = 2 * Math.PI * 28;
+
+var _planeHudVec = new THREE.Vector3();
+var planeEnergyHud;
+
 function beginSteerHint() {
   var hint = document.getElementById('steerHint');
   if (!hint || prefersReducedMotion) return;
@@ -1058,6 +1064,7 @@ function loop(){
   oldTime = newTime;
 
   if (game.status === 'intro' || game.status === 'paused') {
+    if (planeEnergyHud) planeEnergyHud.hidden = true;
     renderer.render(scene, camera);
     requestAnimationFrame(loop);
     return;
@@ -1130,6 +1137,7 @@ function loop(){
   sea.moveWaves();
 
   renderer.render(scene, camera);
+  updatePlaneEnergyHudPosition();
   requestAnimationFrame(loop);
 }
 
@@ -1137,12 +1145,36 @@ function loop(){
 function updateDistance(){
   game.distance += game.speed*deltaTime*game.ratioSpeedDistance;
   fieldDistance.textContent = formatDistance(game.distance);
-  var d = 502*(1-(game.distance%game.distanceForLevelUpdate)/game.distanceForLevelUpdate);
+  var d = LEVEL_RING_C * (1 - (game.distance % game.distanceForLevelUpdate) / game.distanceForLevelUpdate);
   levelCircle.setAttribute("stroke-dashoffset", d);
 
 }
 
-var blinkEnergy=false;
+/**
+ * Position the plane-attached energy HUD using the plane’s projected screen position.
+ */
+function updatePlaneEnergyHudPosition() {
+  if (!planeEnergyHud || !airplane || !camera || !renderer) return;
+  if (game.status === 'intro' || game.status === 'paused') {
+    planeEnergyHud.hidden = true;
+    return;
+  }
+  _planeHudVec.copy(airplane.mesh.position);
+  _planeHudVec.y += 38;
+  _planeHudVec.project(camera);
+  if (Math.abs(_planeHudVec.x) > 1.2 || Math.abs(_planeHudVec.y) > 1.2) {
+    planeEnergyHud.hidden = true;
+    return;
+  }
+  var rect = renderer.domElement.getBoundingClientRect();
+  var x = (_planeHudVec.x * 0.5 + 0.5) * rect.width + rect.left;
+  var y = (-_planeHudVec.y * 0.5 + 0.5) * rect.height + rect.top;
+  x = Math.max(56, Math.min(window.innerWidth - 56, x));
+  y = Math.max(72, Math.min(window.innerHeight - 24, y));
+  planeEnergyHud.style.left = x + 'px';
+  planeEnergyHud.style.top = y + 'px';
+  planeEnergyHud.hidden = false;
+}
 
 /** Energy drains with speed; sub-30% triggers CSS “blinking” on `#energyBar`; at 0 you enter gameover. */
 function updateEnergy(){
@@ -1250,6 +1282,7 @@ function init(event){
   fieldLevel = document.getElementById("levelValue");
   levelCircle = document.getElementById("levelCircleStroke");
   energyLowBadge = document.getElementById("energyLowBadge");
+  planeEnergyHud = document.getElementById("planeEnergyHud");
 
   resetGame();
   createScene();

@@ -1,45 +1,130 @@
-<html>
-	<head>
-		<meta charset="UTF-8" />
-		<meta http-equiv="X-UA-Compatible" content="IE=edge">
-		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<title>BottomGun</title>
-		<link href='https://fonts.googleapis.com/css?family=Playfair+Display:400,700,700italic' rel='stylesheet' type='text/css'>
-		<link rel="stylesheet" type="text/css" href="css/demo.css" />
-		<link rel="stylesheet" type="text/css" href="css/game.css" />
-		<script type="text/javascript" src="scripts/TweenMax.min.js"></script>
-		<script type="text/javascript" src="scripts/three.min.js"></script>
-		<script type="text/javascript" src="scripts/game.js"></script>
-	</head>
-	<body>
-		<div class="game-holder" id="gameHolder">
-			<div class="header">
-				<h1><span>Gun</span>Bottom</h1>
-				<h2>fly it as far as you can</h2>
-				<div class="score" id="score">
-					<div class="score__content" id="level">
-						<div class="score__label">level</div>
-						<div class="score__value score__value--level" id="levelValue">1</div>
-						<svg class="level-circle" id="levelCircle" viewbox="0 0 200 200">
-							<circle id="levelCircleBgr" r="80" cx="100" cy="100" fill="none" stroke="#d1b790" stroke-width="24px" />
-							<circle id="levelCircleStroke" r="80" cx="100" cy="100" fill="none" #f25346 stroke="#68c3c0" stroke-width="14px" stroke-dasharray="502" />
-						</svg>
-					</div>
-					<div class="score__content" id="dist">
-						<div class="score__label">distance</div>
-						<div class="score__value score__value--dist" id="distValue">000</div>
-					</div>
-					<div class="score__content" id="energy">
-						<div class="score__label">energy</div>
-						<div class="score__value score__value--energy" id="energyValue">
-							<div class="energy-bar" id="energyBar"></div>
-						</div>
-					</div>
-				</div>
-			</div>
-			<div class="world" id="world"></div>
-			<div class="message message--replay" id="replayMessage">Click to Replay</div>
-			<div class="message message--instructions" id="instructions">Grab the blue pills<span>avoid the red ones</span></div>
-		</div>
-	</body>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BottomGun</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/game.css" />
+    <script src="scripts/gsap.min.js"></script>
+    <script src="scripts/three.min.js"></script>
+    <script src="scripts/game.js"></script>
+  </head>
+  <body>
+    <div class="game-holder" id="gameHolder">
+      <div class="hud-controls" aria-label="Game controls">
+        <button type="button" class="hud-btn" id="pauseBtn" title="Pause (Esc)" aria-pressed="false">
+          Pause
+        </button>
+        <button type="button" class="hud-btn hud-btn--ghost" id="soundToggleBtn" title="Sound" aria-label="Enable sound">
+          Sound off
+        </button>
+      </div>
+
+      <div class="header">
+        <h1><span>Gun</span>Bottom</h1>
+        <h2>fly it as far as you can</h2>
+
+        <div class="hud-strip" id="score">
+          <div class="hud-card hud-card--level" id="level">
+            <span class="hud-card__label">Level</span>
+            <div class="hud-card__row hud-card__row--level">
+              <svg
+                class="hud-ring"
+                id="levelCircle"
+                viewBox="0 0 72 72"
+                width="32"
+                height="32"
+                aria-hidden="true"
+              >
+                <defs>
+                  <linearGradient id="levelRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#7dd3ce" />
+                    <stop offset="100%" stop-color="#4a9e9b" />
+                  </linearGradient>
+                </defs>
+                <circle
+                  id="levelCircleBgr"
+                  class="hud-ring__track"
+                  r="28"
+                  cx="36"
+                  cy="36"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.35)"
+                  stroke-width="5"
+                />
+                <circle
+                  id="levelCircleStroke"
+                  class="hud-ring__progress"
+                  r="28"
+                  cx="36"
+                  cy="36"
+                  fill="none"
+                  stroke="url(#levelRingGrad)"
+                  stroke-width="5"
+                  stroke-linecap="round"
+                  stroke-dasharray="175.929"
+                  transform="rotate(-90 36 36)"
+                />
+              </svg>
+              <span class="hud-card__value hud-card__value--level" id="levelValue">1</span>
+            </div>
+          </div>
+
+          <div class="hud-card hud-card--dist" id="dist">
+            <span class="hud-card__label">Distance</span>
+            <div class="hud-card__row">
+              <span class="hud-card__value hud-card__value--dist" id="distValue">0</span>
+              <span class="hud-card__unit">m</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="world" id="world" tabindex="-1"></div>
+
+      <!-- Energy: glass capsule pinned to plane (position updated in game.js) -->
+      <div class="plane-energy-hud" id="planeEnergyHud" hidden aria-label="Energy" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+        <div class="plane-energy-capsule">
+          <div class="plane-energy-capsule__track">
+            <div class="plane-energy-capsule__fill" id="energyBar"></div>
+          </div>
+        </div>
+      </div>
+
+      <p class="steer-hint" id="steerHint" aria-hidden="true">Drag up/down — height · Drag left/right — zoom</p>
+
+      <div class="overlay overlay--start" id="startOverlay" role="dialog" aria-modal="true" aria-labelledby="startTitle">
+        <div class="overlay__panel">
+          <h2 class="overlay__title" id="startTitle">How to play</h2>
+          <ul class="overlay__list">
+            <li><strong>Drag up or down</strong> (mouse or finger) to control <strong>flight height</strong>.</li>
+            <li><strong>Drag left or right</strong> to change <strong>camera zoom</strong> (field of view) and forward speed.</li>
+            <li>Collect <span class="txt-cyan">cyan</span> pickups for energy.</li>
+            <li>Avoid <span class="txt-red">red</span> obstacles — they drain energy and knock you back.</li>
+            <li><kbd>Esc</kbd> pauses. Sound starts muted — use <strong>Enable sound</strong> if you want audio.</li>
+          </ul>
+          <div class="overlay__actions">
+            <button type="button" class="btn btn--primary" id="startGameBtn">Start game</button>
+            <button type="button" class="btn btn--secondary" id="enableSoundBtn">Enable sound</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay overlay--pause" id="pauseOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+        <div class="overlay__panel">
+          <h2 class="overlay__title" id="pauseTitle">Paused</h2>
+          <p class="overlay__hint">Press <kbd>Esc</kbd> or Resume to continue.</p>
+          <button type="button" class="btn btn--primary" id="resumeBtn">Resume</button>
+        </div>
+      </div>
+
+      <button type="button" class="message message--replay" id="replayMessage">
+        Tap or click to replay
+      </button>
+      <div class="message message--instructions" id="instructions">
+        Grab the blue pills<span>avoid the red ones</span>
+      </div>
+    </div>
+  </body>
 </html>

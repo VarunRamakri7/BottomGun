@@ -139,62 +139,67 @@
 	color: #d6483b;
 }
 
-/* Top HUD: glass cards + compact level ring beside the number */
+/* Top HUD: compact glass cards + level ring beside the number */
 .hud-strip {
 	display: flex;
 	flex-wrap: wrap;
 	justify-content: center;
 	align-items: stretch;
-	gap: clamp(0.5rem, 2vw, 1rem);
-	margin: clamp(0.85rem, 2.5vh, 1.75rem) auto 0;
-	max-width: min(92vw, 28rem);
-	padding: 0 0.25rem;
+	gap: clamp(0.35rem, 1.2vw, 0.6rem);
+	margin: clamp(0.55rem, 1.8vh, 1.1rem) auto 0;
+	max-width: min(88vw, 20rem);
+	padding: 0 0.15rem;
 }
 
 .hud-card {
 	position: relative;
-	flex: 1 1 auto;
-	min-width: min(42vw, 11rem);
-	max-width: 14rem;
-	padding: 0.55rem 0.85rem 0.65rem;
-	text-align: left;
-	background: rgba(255, 255, 255, 0.42);
-	backdrop-filter: blur(14px);
-	-webkit-backdrop-filter: blur(14px);
-	border: 1px solid rgba(255, 255, 255, 0.55);
-	border-radius: 14px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	flex: 0 1 auto;
+	min-width: 0;
+	width: fit-content;
+	max-width: 9.5rem;
+	padding: 0.32rem 0.55rem 0.38rem;
+	text-align: center;
+	background: rgba(255, 255, 255, 0.38);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	border: 1px solid rgba(255, 255, 255, 0.5);
+	border-radius: 10px;
 	box-shadow:
-		0 4px 24px rgba(45, 42, 38, 0.12),
-		inset 0 1px 0 rgba(255, 255, 255, 0.65);
+		0 3px 16px rgba(45, 42, 38, 0.1),
+		inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .hud-card__label {
 	display: block;
 	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-	font-size: clamp(0.55rem, 1.5vw, 0.65rem);
+	font-size: clamp(0.48rem, 1.2vw, 0.55rem);
 	font-weight: 600;
-	letter-spacing: 0.22em;
+	letter-spacing: 0.18em;
 	text-transform: uppercase;
-	color: rgba(74, 66, 56, 0.72);
-	margin-bottom: 0.35rem;
+	color: rgba(74, 66, 56, 0.68);
+	margin-bottom: 0.2rem;
 }
 
 .hud-card__row {
 	display: flex;
 	align-items: baseline;
-	justify-content: flex-start;
-	gap: 0.2rem;
+	justify-content: center;
+	gap: 0.12rem;
 }
 
 .hud-card__row--level {
 	align-items: center;
-	gap: 0.45rem;
+	justify-content: center;
+	gap: 0.28rem;
 }
 
 .hud-ring {
 	flex-shrink: 0;
 	display: block;
-	filter: drop-shadow(0 2px 6px rgba(74, 158, 155, 0.35));
+	filter: drop-shadow(0 1px 4px rgba(74, 158, 155, 0.3));
 }
 
 .hud-card__value {
@@ -206,7 +211,7 @@
 }
 
 .hud-card__value--level {
-	font-size: clamp(1.5rem, 5vw, 2rem);
+	font-size: clamp(1.05rem, 3.6vw, 1.35rem);
 	line-height: 1;
 	transition:
 		transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
@@ -214,87 +219,57 @@
 }
 
 .hud-card__value--level.level-value--pop {
-	transform: scale(1.12);
+	transform: scale(1.1);
 	color: #2a8a87;
 }
 
 .hud-card__value--dist {
-	font-size: clamp(1.35rem, 4.5vw, 1.85rem);
+	font-size: clamp(1rem, 3.2vw, 1.35rem);
 	line-height: 1;
 }
 
 .hud-card__unit {
 	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-	font-size: clamp(0.7rem, 2vw, 0.8rem);
+	font-size: clamp(0.58rem, 1.6vw, 0.68rem);
 	font-weight: 600;
-	color: rgba(74, 66, 56, 0.55);
-	margin-left: 0.1rem;
+	color: rgba(74, 66, 56, 0.5);
+	margin-left: 0.06rem;
 }
 
-/* Energy bar pinned to plane (position set in JS) */
+/* Energy: horizontal glass capsule, pinned to plane in JS */
 .plane-energy-hud {
 	position: fixed;
 	left: 0;
 	top: 0;
 	z-index: 4;
 	pointer-events: none;
-	transform: translate(-50%, calc(-100% - 10px));
+	transform: translate(-50%, calc(-100% - 4px));
 	will-change: left, top;
 }
 
-.plane-energy-hud__inner {
-	min-width: 112px;
-	max-width: 150px;
-	padding: 0.4rem 0.55rem 0.5rem;
-	background: rgba(20, 22, 28, 0.78);
-	backdrop-filter: blur(12px);
-	-webkit-backdrop-filter: blur(12px);
-	border: 1px solid rgba(255, 255, 255, 0.12);
-	border-radius: 12px;
-	box-shadow:
-		0 8px 32px rgba(0, 0, 0, 0.35),
-		inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-.plane-energy-hud__head {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.4rem;
-	margin-bottom: 0.35rem;
-	min-height: 1em;
-}
-
-.plane-energy-hud__label {
-	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-	font-size: 0.58rem;
-	font-weight: 600;
-	letter-spacing: 0.18em;
-	text-transform: uppercase;
-	color: rgba(255, 255, 255, 0.55);
-}
-
-.plane-energy-hud__low {
-	font-size: 0.52rem;
-	font-weight: 700;
-	letter-spacing: 0.12em;
-	text-transform: uppercase;
-	color: #ff8a80;
-	background: rgba(255, 82, 82, 0.22);
-	border-radius: 4px;
-	padding: 0.12em 0.4em;
-}
-
-.plane-energy-hud__track {
-	position: relative;
-	height: 7px;
+.plane-energy-capsule {
+	width: 64px;
+	padding: 4px 6px;
+	background: rgba(255, 255, 255, 0.38);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	border: 1px solid rgba(255, 255, 255, 0.55);
 	border-radius: 999px;
-	background: rgba(255, 255, 255, 0.12);
-	overflow: hidden;
-	box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+	box-shadow:
+		0 4px 14px rgba(35, 55, 75, 0.18),
+		inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
-.plane-energy-hud__fill {
+.plane-energy-capsule__track {
+	position: relative;
+	height: 8px;
+	border-radius: 999px;
+	background: rgba(30, 80, 120, 0.12);
+	overflow: hidden;
+	box-shadow: inset 0 1px 2px rgba(0, 40, 80, 0.15);
+}
+
+.plane-energy-capsule__fill {
 	position: absolute;
 	top: 0;
 	right: 0;
@@ -302,6 +277,8 @@
 	left: 0;
 	margin: 1px;
 	border-radius: 999px;
+	background: linear-gradient(90deg, #1e6b9e 0%, #4db8e8 55%, #7dd3f5 100%);
+	background-size: 120% 100%;
 	-webkit-animation-name: none;
 	animation-name: none;
 	-webkit-animation-duration: 150ms;
@@ -314,7 +291,7 @@
 	.hud-card__value--level {
 		transition: none;
 	}
-	.plane-energy-hud__fill {
+	.plane-energy-capsule__fill {
 		animation: none !important;
 	}
 }

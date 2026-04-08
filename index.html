@@ -33,8 +33,8 @@
                 class="hud-ring"
                 id="levelCircle"
                 viewBox="0 0 72 72"
-                width="44"
-                height="44"
+                width="32"
+                height="32"
                 aria-hidden="true"
               >
                 <defs>
@@ -83,15 +83,11 @@
 
       <div class="world" id="world" tabindex="-1"></div>
 
-      <!-- Energy follows the plane in screen space (position updated in game.js) -->
-      <div class="plane-energy-hud" id="planeEnergyHud" hidden>
-        <div class="plane-energy-hud__inner">
-          <div class="plane-energy-hud__head">
-            <span class="plane-energy-hud__label">Energy</span>
-            <span class="plane-energy-hud__low" id="energyLowBadge" hidden>Low</span>
-          </div>
-          <div class="plane-energy-hud__track">
-            <div class="plane-energy-hud__fill" id="energyBar"></div>
+      <!-- Energy: glass capsule pinned to plane (position updated in game.js) -->
+      <div class="plane-energy-hud" id="planeEnergyHud" hidden aria-label="Energy" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+        <div class="plane-energy-capsule">
+          <div class="plane-energy-capsule__track">
+            <div class="plane-energy-capsule__fill" id="energyBar"></div>
           </div>
         </div>
       </div>

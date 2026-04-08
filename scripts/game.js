@@ -1160,7 +1160,7 @@ function updatePlaneEnergyHudPosition() {
     return;
   }
   _planeHudVec.copy(airplane.mesh.position);
-  _planeHudVec.y += 38;
+  _planeHudVec.y += 14;
   _planeHudVec.project(camera);
   if (Math.abs(_planeHudVec.x) > 1.2 || Math.abs(_planeHudVec.y) > 1.2) {
     planeEnergyHud.hidden = true;
@@ -1169,22 +1169,30 @@ function updatePlaneEnergyHudPosition() {
   var rect = renderer.domElement.getBoundingClientRect();
   var x = (_planeHudVec.x * 0.5 + 0.5) * rect.width + rect.left;
   var y = (-_planeHudVec.y * 0.5 + 0.5) * rect.height + rect.top;
-  x = Math.max(56, Math.min(window.innerWidth - 56, x));
-  y = Math.max(72, Math.min(window.innerHeight - 24, y));
+  x = Math.max(48, Math.min(window.innerWidth - 48, x));
+  y = Math.max(40, Math.min(window.innerHeight - 16, y));
   planeEnergyHud.style.left = x + 'px';
   planeEnergyHud.style.top = y + 'px';
   planeEnergyHud.hidden = false;
 }
 
-/** Energy drains with speed; sub-30% triggers CSS “blinking” on `#energyBar`; at 0 you enter gameover. */
+/** Energy drains with speed; capsule fill is blue → warm/red when low; at 0 you enter gameover. */
 function updateEnergy(){
   game.energy -= game.speed*deltaTime*game.ratioSpeedEnergy;
   game.energy = Math.max(0, game.energy);
   energyBar.style.right = (100-game.energy)+"%";
-  energyBar.style.backgroundColor = (game.energy<50)? "#f25346" : "#68c3c0";
 
-  if (energyLowBadge) {
-    energyLowBadge.hidden = game.energy >= 30;
+  var e = game.energy;
+  if (e < 30) {
+    energyBar.style.background = "linear-gradient(90deg, #b71c1c 0%, #ff7043 100%)";
+  } else if (e < 50) {
+    energyBar.style.background = "linear-gradient(90deg, #1565a8 0%, #ffb74d 100%)";
+  } else {
+    energyBar.style.background = "linear-gradient(90deg, #1e6b9e 0%, #4db8e8 55%, #7dd3f5 100%)";
+  }
+
+  if (planeEnergyHud) {
+    planeEnergyHud.setAttribute("aria-valuenow", String(Math.round(e)));
   }
 
   if (game.energy<30 && !prefersReducedMotion){
@@ -1271,7 +1279,7 @@ function normalize(v,vmin,vmax,tmin, tmax){
   return tv;
 }
 
-var fieldDistance, energyBar, replayMessage, fieldLevel, levelCircle, energyLowBadge;
+var fieldDistance, energyBar, replayMessage, fieldLevel, levelCircle;
 
 /** Wire DOM, reset state, build the 3D scene, attach input listeners, start `loop`. */
 function init(event){
@@ -1281,7 +1289,6 @@ function init(event){
   replayMessage = document.getElementById("replayMessage");
   fieldLevel = document.getElementById("levelValue");
   levelCircle = document.getElementById("levelCircleStroke");
-  energyLowBadge = document.getElementById("energyLowBadge");
   planeEnergyHud = document.getElementById("planeEnergyHud");
 
   resetGame();

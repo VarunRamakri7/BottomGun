@@ -1,4 +1,19 @@
-//COLORS
+/**
+ * BottomGun — WebGL endless flyer (Three.js + GSAP).
+ *
+ * How the file is organized (read top to bottom):
+ *   1) Colors, the mutable `game` state object, and mesh pools for reuse
+ *   2) Scene, camera, renderer, resize, pointer input, lights
+ *   3) Constructor functions: Pilot, AirPlane, Sea, Sky, Cloud, Ennemy, Coin, Particle (+ “Holder” groups)
+ *   4) `create*` helpers — build the scene graph and assign globals like `airplane`, `sea`
+ *   5) `loop` — requestAnimationFrame game loop; branches on `game.status`
+ *   6) HUD updates (`updateDistance`, `updateEnergy`), flight (`updatePlane`), `init` entry point
+ *
+ * `game.status`: "playing" → normal flight | "gameover" → plane falls | "waitingReplay" → click/tap restarts
+ * `mousePos`: normalized from pointer x/y (~[-1,1]) — drives speed, height, and camera FOV.
+ */
+
+// --- Material palette (hex integers for THREE.Color / Mesh*Material) ---
 var Colors = {
     red:0xf25346,
     white:0xd8d0d1,
@@ -10,15 +25,18 @@ var Colors = {
 
 };
 
-// GAME VARIABLES
+// --- Core simulation state (single object; reset in `resetGame`) ---
 var game;
 var deltaTime = 0;
 var newTime = new Date().getTime();
 var oldTime = new Date().getTime();
+/** Pre-built Ennemy meshes popped when spawning a new wave (avoids constant alloc). */
 var ennemiesPool = [];
+/** Particle meshes recycled after GSAP tweens finish. */
 var particlesPool = [];
 var particlesInUse = [];
 
+/** Reset all tunables to defaults; call on startup and when restarting after game over. */
 function resetGame(){
   game = {speed:0,
           initSpeed:.00035,
@@ -78,26 +96,24 @@ function resetGame(){
           ennemyLastSpawn:0,
           distanceForEnnemiesSpawn:50,
 
+          // "playing" | "gameover" | "waitingReplay" — see file header
           status : "playing",
          };
   fieldLevel.innerHTML = Math.floor(game.level);
 }
 
-//THREEJS RELATED VARIABLES
-
+// --- Three.js scene graph (globals; assigned in `createScene` / `createLights`) ---
 var scene,
     camera, fieldOfView, aspectRatio, nearPlane, farPlane,
     renderer,
     container,
     controls;
 
-//SCREEN & MOUSE VARIABLES
-
+// --- Viewport pixel size + steering input (updated from pointermove) ---
 var HEIGHT, WIDTH,
     mousePos = { x: 0, y: 0 };
 
-//INIT THREE JS, SCREEN AND MOUSE EVENTS
-
+/** Create scene, perspective camera, fog, WebGLRenderer, and attach canvas to `#world`. */
 function createScene() {
 
   HEIGHT = window.innerHeight;
@@ -114,7 +130,7 @@ function createScene() {
     nearPlane,
     farPlane
     );
-  scene.fog = new THREE.Fog(0xf7d9aa, 100,950);
+  scene.fog = new THREE.Fog(0xf7d9aa, 100,950); // distance fog — hides horizon
   camera.position.x = 0;
   camera.position.z = 200;
   camera.position.y = game.planeDefaultHeight;
@@ -122,6 +138,7 @@ function createScene() {
 
   renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(WIDTH, HEIGHT);
+  // Cap DPR so 3x/4x mobile displays don’t melt the GPU
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
   renderer.shadowMap.enabled = true;
@@ -141,8 +158,7 @@ function createScene() {
   //*/
 }
 
-// MOUSE AND SCREEN EVENTS
-
+/** Keep renderer and camera in sync when the window is resized. */
 function handleWindowResize() {
   HEIGHT = window.innerHeight;
   WIDTH = window.innerWidth;
@@ -151,6 +167,10 @@ function handleWindowResize() {
   camera.updateProjectionMatrix();
 }
 
+/**
+ * Map client coordinates to a centered [-1, 1] range (x = horizontal steer, y = vertical).
+ * Used by `updatePlane` via `normalize()` for target position and speed.
+ */
 function setPointerFromEvent(event) {
   var tx = -1 + (event.clientX / WIDTH) * 2;
   var ty = 1 - (event.clientY / HEIGHT) * 2;
@@ -161,6 +181,7 @@ function handlePointerMove(event) {
   setPointerFromEvent(event);
 }
 
+/** After crash, any pointer up restarts the run (paired with HUD “Click to Replay”). */
 function handlePointerUp() {
   if (game.status == "waitingReplay") {
     resetGame();
@@ -168,10 +189,9 @@ function handlePointerUp() {
   }
 }
 
-// LIGHTS
-
 var ambientLight, hemisphereLight, shadowLight;
 
+/** Hemisphere + ambient fill + one shadow-casting sun; `ambientLight` spikes on enemy hit. */
 function createLights() {
 
   hemisphereLight = new THREE.HemisphereLight(0xaaaaaa,0x000000, .9)
@@ -192,14 +212,14 @@ function createLights() {
 
   var ch = new THREE.CameraHelper(shadowLight.shadow.camera);
 
-  //scene.add(ch);
+  //scene.add(ch); // uncomment to debug shadow frustum
   scene.add(hemisphereLight);
   scene.add(shadowLight);
   scene.add(ambientLight);
 
 }
 
-
+/** Small character mesh in the cockpit; `updateHairs` wiggles the hair cards while flying. */
 var Pilot = function(){
   this.mesh = new THREE.Object3D();
   this.mesh.name = "pilot";
@@ -277,7 +297,6 @@ var Pilot = function(){
 }
 
 Pilot.prototype.updateHairs = function(){
-  //*
    var hairs = this.hairsTop.children;
 
    var l = hairs.length;
@@ -286,9 +305,12 @@ Pilot.prototype.updateHairs = function(){
       h.scale.y = .75 + Math.cos(this.angleHairs+i/3)*.25;
    }
   this.angleHairs += game.speed*deltaTime*40;
-  //*/
 }
 
+/**
+ * Player airplane: cabin vertices are hand-tweaked for a stub nose; propeller is `this.propeller`.
+ * Collision knockback uses `game.planeCollisionSpeed*` / `planeCollisionDisplacement*`.
+ */
 var AirPlane = function(){
   this.mesh = new THREE.Object3D();
   this.mesh.name = "airPlane";
@@ -435,6 +457,7 @@ var AirPlane = function(){
 
 };
 
+/** Distant cloud ring around the track; whole group slowly rotates in `moveClouds`. */
 Sky = function(){
   this.mesh = new THREE.Object3D();
   this.nClouds = 20;
@@ -455,6 +478,7 @@ Sky = function(){
   }
 }
 
+/** Per-cloud jitter + slow roll of the whole sky group. */
 Sky.prototype.moveClouds = function(){
   for(var i=0; i<this.nClouds; i++){
     var c = this.clouds[i];
@@ -464,6 +488,10 @@ Sky.prototype.moveClouds = function(){
 
 }
 
+/**
+ * Water surface: a cylinder laid flat; each vertex has a sine-wave phase stored in `this.waves`.
+ * Uses legacy `Geometry.vertices` (older Three.js); upgrading Three requires BufferGeometry port.
+ */
 Sea = function(){
   var geom = new THREE.CylinderGeometry(game.seaRadius,game.seaRadius,game.seaLength,40,10);
   geom.applyMatrix(new THREE.Matrix4().makeRotationX(-Math.PI/2));
@@ -475,6 +503,7 @@ Sea = function(){
   for (var i=0;i<l;i++){
     var v = geom.vertices[i];
     //v.y = Math.random()*30;
+    // Per-vertex wave params: base x,y + oscillation angle/amplitude/speed
     this.waves.push({y:v.y,
                      x:v.x,
                      z:v.z,
@@ -497,6 +526,7 @@ Sea = function(){
 
 }
 
+/** Animate each sea vertex using its entry in `this.waves` (cos/sin displacement in the surface plane). */
 Sea.prototype.moveWaves = function (){
   var verts = this.mesh.geometry.vertices;
   var l = verts.length;
@@ -510,6 +540,7 @@ Sea.prototype.moveWaves = function (){
   }
 }
 
+/** One cloud = several scaled cubes; `rotate` jitters each block for cheap motion. */
 Cloud = function(){
   this.mesh = new THREE.Object3D();
   this.mesh.name = "cloud";
@@ -519,7 +550,6 @@ Cloud = function(){
 
   });
 
-  //*
   var nBlocs = 3+Math.floor(Math.random()*3);
   for (var i=0; i<nBlocs; i++ ){
     var m = new THREE.Mesh(geom.clone(), mat);
@@ -535,7 +565,6 @@ Cloud = function(){
     m.receiveShadow = true;
 
   }
-  //*/
 }
 
 Cloud.prototype.rotate = function(){
@@ -547,6 +576,7 @@ Cloud.prototype.rotate = function(){
   }
 }
 
+/** Red tetrahedron hazard; moves on a circular path (see `ennemy.angle` / `distance`). */
 Ennemy = function(){
   var geom = new THREE.TetrahedronGeometry(8,2);
   var mat = new THREE.MeshPhongMaterial({
@@ -561,11 +591,13 @@ Ennemy = function(){
   this.dist = 0;
 }
 
+/** Owns all active enemy meshes; `spawnEnnemies` wave size scales with `game.level`. */
 EnnemiesHolder = function (){
   this.mesh = new THREE.Object3D();
   this.ennemiesInUse = [];
 }
 
+/** Spawn `game.level` enemies staggered on the ring; reuses `ennemiesPool` when possible. */
 EnnemiesHolder.prototype.spawnEnnemies = function(){
   var nEnnemies = game.level;
 
@@ -587,6 +619,7 @@ EnnemiesHolder.prototype.spawnEnnemies = function(){
   }
 }
 
+/** Advance angles, test distance to plane, recycle when past the player (angle > π). */
 EnnemiesHolder.prototype.rotateEnnemies = function(){
   for (var i=0; i<this.ennemiesInUse.length; i++){
     var ennemy = this.ennemiesInUse[i];
@@ -599,7 +632,6 @@ EnnemiesHolder.prototype.rotateEnnemies = function(){
     ennemy.mesh.rotation.z += Math.random()*.1;
     ennemy.mesh.rotation.y += Math.random()*.1;
 
-    //var globalEnnemyPosition =  ennemy.mesh.localToWorld(new THREE.Vector3());
     var diffPos = airplane.mesh.position.clone().sub(ennemy.mesh.position.clone());
     var d = diffPos.length();
     if (d<game.ennemyDistanceTolerance){
@@ -614,6 +646,7 @@ EnnemiesHolder.prototype.rotateEnnemies = function(){
       removeEnergy();
       i--;
     }else if (ennemy.angle > Math.PI){
+      // Passed behind the player — recycle to pool
       ennemiesPool.unshift(this.ennemiesInUse.splice(i,1)[0]);
       this.mesh.remove(ennemy.mesh);
       i--;
@@ -621,6 +654,7 @@ EnnemiesHolder.prototype.rotateEnnemies = function(){
   }
 }
 
+/** Single debris tetrahedron; `explode` runs GSAP tweens then returns the mesh to `particlesPool`. */
 Particle = function(){
   var geom = new THREE.TetrahedronGeometry(3,0);
   var mat = new THREE.MeshPhongMaterial({
@@ -658,11 +692,13 @@ Particle.prototype.explode = function(pos, color, scale){
   });
 }
 
+/** Parent object for all particle meshes (added to scene in `createParticles`). */
 ParticlesHolder = function (){
   this.mesh = new THREE.Object3D();
   this.particlesInUse = [];
 }
 
+/** Instantiates `density` particles at `pos` (burst effect for coin pickup / crash). */
 ParticlesHolder.prototype.spawnParticles = function(pos, density, color, scale){
 
   var nPArticles = density;
@@ -682,6 +718,7 @@ ParticlesHolder.prototype.spawnParticles = function(pos, density, color, scale){
   }
 }
 
+/** Collectible (cyan); `distance` + `angle` place it on the same cylindrical path as enemies. */
 Coin = function(){
   var geom = new THREE.TetrahedronGeometry(5,0);
   var mat = new THREE.MeshPhongMaterial({
@@ -697,6 +734,7 @@ Coin = function(){
   this.dist = 0;
 }
 
+/** Pre-allocates `nCoins` meshes into `coinsPool`; `spawnCoins` releases waves toward the player. */
 CoinsHolder = function (nCoins){
   this.mesh = new THREE.Object3D();
   this.coinsInUse = [];
@@ -707,6 +745,7 @@ CoinsHolder = function (nCoins){
   }
 }
 
+/** Drop a clump of coins on a ring segment (`amplitude` wobbles radius). */
 CoinsHolder.prototype.spawnCoins = function(){
 
   var nCoins = 1 + Math.floor(Math.random()*10);
@@ -728,6 +767,7 @@ CoinsHolder.prototype.spawnCoins = function(){
   }
 }
 
+/** Same idea as enemies: orbit, collect on proximity, else recycle after half orbit. */
 CoinsHolder.prototype.rotateCoins = function(){
   for (var i=0; i<this.coinsInUse.length; i++){
     var coin = this.coinsInUse[i];
@@ -739,7 +779,6 @@ CoinsHolder.prototype.rotateCoins = function(){
     coin.mesh.rotation.z += Math.random()*.1;
     coin.mesh.rotation.y += Math.random()*.1;
 
-    //var globalCoinPosition =  coin.mesh.localToWorld(new THREE.Vector3());
     var diffPos = airplane.mesh.position.clone().sub(coin.mesh.position.clone());
     var d = diffPos.length();
     if (d<game.coinDistanceTolerance){
@@ -749,6 +788,7 @@ CoinsHolder.prototype.rotateCoins = function(){
       addEnergy();
       i--;
     }else if (coin.angle > Math.PI){
+      // Missed — put back in pool
       this.coinsPool.unshift(this.coinsInUse.splice(i,1)[0]);
       this.mesh.remove(coin.mesh);
       i--;
@@ -757,11 +797,18 @@ CoinsHolder.prototype.rotateCoins = function(){
 }
 
 
-// 3D Models
+// --- Scene roots (singletons assigned in the `create*` functions below) ---
 var sea;
 var airplane;
+var sky;
+var coinsHolder;
+var ennemiesHolder;
+var particlesHolder;
+
+// --- Scene assembly (each pushes meshes into `scene` and sets globals above) ---
 
 function createPlane(){
+  // Player scale/height tuned for the world units used by sea radius & coin paths
   airplane = new AirPlane();
   airplane.mesh.scale.set(.25,.25,.25);
   airplane.mesh.position.y = game.planeDefaultHeight;
@@ -781,7 +828,6 @@ function createSky(){
 }
 
 function createCoins(){
-
   coinsHolder = new CoinsHolder(20);
   scene.add(coinsHolder.mesh)
 }
@@ -806,6 +852,10 @@ function createParticles(){
   scene.add(particlesHolder.mesh)
 }
 
+/**
+ * Main frame: compute `deltaTime`, branch on `game.status`, then advance all actors and render.
+ * Order matters: gameplay updates run before `renderer.render` (sea/sky/propeller animate every frame).
+ */
 function loop(){
 
   newTime = new Date().getTime();
@@ -814,7 +864,7 @@ function loop(){
 
   if (game.status=="playing"){
 
-    // Add energy coins every 100m;
+    // Milestone triggers (distance is in abstract units; see `ratioSpeedDistance`)
     if (Math.floor(game.distance)%game.distanceForCoinsSpawn == 0 && Math.floor(game.distance) > game.coinLastSpawn){
       game.coinLastSpawn = Math.floor(game.distance);
       coinsHolder.spawnCoins();
@@ -847,6 +897,7 @@ function loop(){
     game.speed = game.baseSpeed * game.planeSpeed;
 
   }else if(game.status=="gameover"){
+    // Crash animation until plane falls far enough, then offer replay
     game.speed *= .99;
     airplane.mesh.rotation.z += (-Math.PI/2 - airplane.mesh.rotation.z)*.0002*deltaTime;
     airplane.mesh.rotation.x += 0.0003*deltaTime;
@@ -859,7 +910,7 @@ function loop(){
 
     }
   }else if (game.status=="waitingReplay"){
-
+    // Idle until `handlePointerUp` calls `resetGame`
   }
 
 
@@ -880,6 +931,7 @@ function loop(){
   requestAnimationFrame(loop);
 }
 
+/** HUD distance text + SVG ring progress toward the next level (`stroke-dashoffset` trick). */
 function updateDistance(){
   game.distance += game.speed*deltaTime*game.ratioSpeedDistance;
   fieldDistance.innerHTML = Math.floor(game.distance);
@@ -890,6 +942,7 @@ function updateDistance(){
 
 var blinkEnergy=false;
 
+/** Energy drains with speed; sub-30% triggers CSS “blinking” on `#energyBar`; at 0 you enter gameover. */
 function updateEnergy(){
   game.energy -= game.speed*deltaTime*game.ratioSpeedEnergy;
   game.energy = Math.max(0, game.energy);
@@ -907,18 +960,22 @@ function updateEnergy(){
   }
 }
 
+/** Called when collecting a coin; caps at 100%. */
 function addEnergy(){
   game.energy += game.coinValue;
   game.energy = Math.min(game.energy, 100);
 }
 
+/** Enemy hit — subtracts `ennemyValue` and clamps to 0. */
 function removeEnergy(){
   game.energy -= game.ennemyValue;
   game.energy = Math.max(0, game.energy);
 }
 
-
-
+/**
+ * Smoothly steers the plane toward pointer-derived targets and updates camera FOV / follow height.
+ * `planeCollision*` fields add temporary knockback after hitting an enemy (decay each frame).
+ */
 function updatePlane(){
 
   game.planeSpeed = normalize(mousePos.x,-.5,.5,game.planeMinSpeed, game.planeMaxSpeed);
@@ -958,6 +1015,7 @@ function hideReplay(){
   replayMessage.style.display="none";
 }
 
+/** Linear map: clamp `v` to [vmin,vmax], then remap proportionally to [tmin,tmax]. */
 function normalize(v,vmin,vmax,tmin, tmax){
   var nv = Math.max(Math.min(v,vmax), vmin);
   var dv = vmax-vmin;
@@ -969,9 +1027,8 @@ function normalize(v,vmin,vmax,tmin, tmax){
 
 var fieldDistance, energyBar, replayMessage, fieldLevel, levelCircle;
 
+/** Wire DOM, reset state, build the 3D scene, attach input listeners, start `loop`. */
 function init(event){
-
-  // UI
 
   fieldDistance = document.getElementById("distValue");
   energyBar = document.getElementById("energyBar");

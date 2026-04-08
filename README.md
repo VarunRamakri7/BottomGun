@@ -42,7 +42,7 @@ The inline SVG in `index.html` drives the **level progress ring** (`stroke-dasho
 `game.js` uses `requestAnimationFrame` in `loop()`. Each frame it:
 
 1. Computes **`deltaTime`** from wall-clock time (ms between frames).
-2. Branches on **`game.status`** (`"playing"` → normal flight; `"gameover"` → fall animation; `"waitingReplay"` → wait for input).
+2. Branches on **`game.status`** (`"intro"` → help overlay; `"paused"` → frozen frame; `"playing"` → flight; `"gameover"` → fall; `"waitingReplay"` → tap to restart).
 3. While playing, checks **distance milestones** to spawn coins, ramp speed, spawn enemies, and level up.
 4. Updates the plane, sea waves, clouds, coins, enemies, and particles, then **`renderer.render(scene, camera)`**.
 
@@ -52,12 +52,12 @@ Almost all tunables live on a single object, **`game`**, reset in **`resetGame()
 
 ### Pointer input
 
-Pointer position is normalized to roughly **[-1, 1]** on X and Y (`setPointerFromEvent`). **`updatePlane()`** maps that to:
+With **mouse or touch**, the player **drags** to steer. Pointer position is normalized to roughly **[-1, 1]** on X and Y (`setPointerFromEvent`). **`updatePlane()`** maps that to:
 
-- **Horizontal**: forward speed and camera **field of view** (wider/narrow “zoom” feel).
-- **Vertical**: target altitude and slight roll/pitch on the plane mesh.
+- **Drag left / right** (**horizontal**): forward **speed** and camera **field of view** (narrower FOV feels like zooming in).
+- **Drag up / down** (**vertical**): **flight height** and slight roll/pitch on the plane mesh.
 
-Events are bound on **`document`** (`pointermove`, `pointerup`, `pointercancel`) so both mouse and touch work with one code path. The HUD layer uses CSS **`pointer-events: none`** so input passes through to the canvas.
+Events are bound on **`document`** (`pointermove`, `pointerup`, `pointercancel`) so both mouse and touch use one code path. The HUD layer uses CSS **`pointer-events: none`** so input passes through to the canvas.
 
 ### 3D scene
 
@@ -76,26 +76,25 @@ DOM nodes (`#distValue`, `#levelValue`, `#energyBar`, `#levelCircleStroke`, repl
 
 ---
 
+## UX features
+
+- **First-run overlay** explains controls; dismissed with **Start game** (stored in `localStorage` as `bottomgun_onboarding_done`).
+- **Steer hint** fades in after starting, then hides after a few seconds.
+- **Pause** (`Esc` or the Pause control) freezes the scene; **Resume** continues.
+- **Web Audio** beeps for coin, hit, level-up, and game over — **off by default**; use **Enable sound** on the intro panel or **Sound off/on** in the corner.
+- **HUD**: comma-separated distance, **Low** badge under energy when below 30%, cyan/red **flash** on pickup/hit, level number **pops** on level-up.
+- **`prefers-reduced-motion`**: softer HUD flashes, no energy-bar blink, particle bursts skip GSAP.
+- **Safe-area** padding and **`touch-action: none`** on the game shell for mobile notches and less accidental scroll.
+
 ## Controls
 
 | Input | Effect |
 |--------|--------|
-| **Pointer horizontal** | Speed and camera FOV (left/right) |
-| **Pointer vertical** | Flight height |
-| **Pointer up** (after crash) | Restart when the game shows replay |
-
----
-
-## Running locally
-
-Because scripts load as classic files (not ES modules), use any static file server so paths behave consistently:
-
-```bash
-# Python 3
-python3 -m http.server 8080
-```
-
-Then open `http://localhost:8080/` and open `index.html` (or the server root if it maps to this folder).
+| **Drag up / down** | Flight height |
+| **Drag left / right** | Forward speed and camera zoom (FOV) |
+| **Esc** | Pause / resume (while playing or paused) |
+| **Space / Enter** | Restart after game over (when replay is offered) |
+| **Tap / click** | Restart after crash (anywhere, or the large replay control) |
 
 ---
 

@@ -1,10 +1,104 @@
 # BottomGun
-The full version of the game made using WebGL and Three.js
 
-This is an endless flyer where you collect items while avoiding obstacles.
+BottomGun is a browser-based endless flyer: you steer a small airplane around a cylindrical “track”, collect cyan pickups for energy, and avoid red obstacles. Distance and level increase as you survive longer.
 
-The flyer is controlled with the mouse.
-  - Left and right will alter zoom.
-  - Up and down will alter flyer height
+**[Play the live demo](https://varunramakri7.github.io/BottomGun/)**
 
-Click [here](https://varunramakri7.github.io/BottomGun/) to play
+---
+
+## Tech stack
+
+| Piece | Role |
+|--------|------|
+| **Three.js** (`scripts/three.min.js`) | WebGL scene, camera, fog, lights, shadows, meshes |
+| **GSAP 3** (`scripts/gsap.min.js`) | Short tweens for particle bursts (coin/enemy effects) |
+| **Vanilla JavaScript** (`scripts/game.js`) | Game logic, animation loop, DOM HUD updates |
+| **HTML / CSS** | Layout, HUD, self-hosted **Playfair Display** (WOFF2 in `fonts/`) |
+
+---
+
+## Repository layout
+
+```
+index.html          # Page shell, HUD markup, script tags (order: GSAP → Three → game)
+css/
+  styles.css        # Font @font-face, global reset, body/link styles, .world base
+  game.css          # Full-screen game shell, header, score, energy bar, messages
+fonts/              # Playfair Display (Latin subset, WOFF2)
+scripts/
+  gsap.min.js       # Animation library (vendored)
+  three.min.js      # Three.js (vendored; matches legacy geometry APIs in game.js)
+  game.js           # All gameplay and rendering logic (see comments in file)
+```
+
+The inline SVG in `index.html` drives the **level progress ring** (`stroke-dashoffset` is updated from JavaScript as distance increases).
+
+---
+
+## How it works (implementation)
+
+### Game loop
+
+`game.js` uses `requestAnimationFrame` in `loop()`. Each frame it:
+
+1. Computes **`deltaTime`** from wall-clock time (ms between frames).
+2. Branches on **`game.status`** (`"playing"` → normal flight; `"gameover"` → fall animation; `"waitingReplay"` → wait for input).
+3. While playing, checks **distance milestones** to spawn coins, ramp speed, spawn enemies, and level up.
+4. Updates the plane, sea waves, clouds, coins, enemies, and particles, then **`renderer.render(scene, camera)`**.
+
+### Simulation state
+
+Almost all tunables live on a single object, **`game`**, reset in **`resetGame()`**: speed curves, energy drain, spawn intervals, level spacing, plane movement sensitivity, collision knockback, sea dimensions, etc. Adjusting difficulty or feel usually means editing those numbers (the top of `game.js` documents structure in comments).
+
+### Pointer input
+
+Pointer position is normalized to roughly **[-1, 1]** on X and Y (`setPointerFromEvent`). **`updatePlane()`** maps that to:
+
+- **Horizontal**: forward speed and camera **field of view** (wider/narrow “zoom” feel).
+- **Vertical**: target altitude and slight roll/pitch on the plane mesh.
+
+Events are bound on **`document`** (`pointermove`, `pointerup`, `pointercancel`) so both mouse and touch work with one code path. The HUD layer uses CSS **`pointer-events: none`** so input passes through to the canvas.
+
+### 3D scene
+
+- **Sea**: A large cylinder, rotated flat, with **per-vertex wave motion** (legacy Three `Geometry` / `.vertices` API — tied to the vendored Three version).
+- **Sky**: A ring of **cloud** groups (random cubes), rotated slowly with world speed.
+- **Airplane**: Built from boxes with tweaked vertices; **propeller** spins every frame.
+- **Coins / enemies**: Placed on a **circular path** using angle + radius; each frame advances the angle and tests distance to the plane. Objects are **pooled** (`ennemiesPool`, `particlesPool`, coin pools inside `CoinsHolder`) to reduce allocation.
+
+### HUD
+
+DOM nodes (`#distValue`, `#levelValue`, `#energyBar`, `#levelCircleStroke`, replay message) are updated from the same loop. Energy drains with speed; low energy triggers a CSS blink animation on the bar.
+
+### GitHub Pages
+
+`_config.yml` selects a Jekyll theme; if you publish **only** the static files for this game, you typically deploy the folder contents as static assets (or use a workflow that uploads the site root). If the repo root is built as a Jekyll site, ensure asset paths still resolve for `css/`, `scripts/`, and `fonts/`.
+
+---
+
+## Controls
+
+| Input | Effect |
+|--------|--------|
+| **Pointer horizontal** | Speed and camera FOV (left/right) |
+| **Pointer vertical** | Flight height |
+| **Pointer up** (after crash) | Restart when the game shows replay |
+
+---
+
+## Running locally
+
+Because scripts load as classic files (not ES modules), use any static file server so paths behave consistently:
+
+```bash
+# Python 3
+python3 -m http.server 8080
+```
+
+Then open `http://localhost:8080/` and open `index.html` (or the server root if it maps to this folder).
+
+---
+
+## Fonts
+
+**Playfair Display** is bundled under `fonts/` (WOFF2) and declared in `css/styles.css`. The typeface is licensed under the [SIL Open Font License](https://scripts.sil.org/OFL) (see the [Playfair Display](https://fonts.google.com/specimen/Playfair+Display) project).
